@@ -1,11 +1,11 @@
-#ifndef M_COROUTINE_COWIN_INCLUDE
-#define M_COROUTINE_COWIN_INCLUDE
+#ifndef M_COROUTINE_COWIN_IMPL_INCLUDE
+#define M_COROUTINE_COWIN_IMPL_INCLUDE
 
 #ifdef M_PLATFORM_WIN
 M_COROUTINE_NAMESPACE_BEGIN
 
 template<int N>
-inline void __stdcall pub_coroutine(LPVOID p);
+void __stdcall pub_coroutine(LPVOID p);
 
 template<typename T>
 bool basecoroutine<T>::initEnv(unsigned int stack_size) {
@@ -96,7 +96,7 @@ void basecoroutine<T>::yield() {
 }
 
 template<int N>
-inline void __stdcall pub_coroutine(LPVOID p) {
+void __stdcall pub_coroutine(LPVOID p) {
 	_schedule_& schedule = gschedule;
 	if (schedule._cur_co) {
 		(schedule._cur_co->_function)(schedule._cur_co->_data);

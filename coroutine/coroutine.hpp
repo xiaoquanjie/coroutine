@@ -19,37 +19,39 @@ struct _coroutine_ {
 };
 typedef std::map<int, _coroutine_*> CoroutineMap;
 struct _schedule_ {
-	int _index;
-	LPVOID _mainctx;
-	_coroutine_* _cur_co;
-	CoroutineMap _co[1024];
-
 	_schedule_() {
 		_mainctx = 0;
 		_index = 0;
 		_cur_co = 0;
 	}
+	int _index;
+	LPVOID _mainctx;
+	_coroutine_* _cur_co;
+	CoroutineMap _co[1024];
 };
 #else
+#define M_COROUTINE_STACK_SIZE  4*1024*1024
 struct _coroutine_ {
-	int _id;
-	char* _stack;	// private stack
-	ucontext_t _ctx;
-	void* _data;
+	int			_id;
+	int			_status;
+	char*		_stack;
+	int			_size;
+	int			_cap;
+	ucontext_t	_ctx;
+	void*		_data;
 	_coroutine_func_ _function;
 };
 typedef std::map<int, _coroutine_*> CoroutineMap;
 struct _schedule_ {
-	char _stack[1024 * 1024];
-	int _cur_id;
-	ucontext_t _mainctx;
-	int _index;
-	CoroutineMap _co[1024];
-
 	_schedule_() {
-		_cur_id = -1;
-		_index = 0;
+		_cur_co = 0;
+		_index = -1;
 	}
+	int	_index;
+	ucontext_t _mainctx;
+	_coroutine_* _cur_co;
+	char _stack[M_COROUTINE_STACK_SIZE];
+	CoroutineMap _co[1024];
 };
 #endif
 

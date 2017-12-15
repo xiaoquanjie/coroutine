@@ -20,8 +20,12 @@
 #include <windows.h>
 #else
 #include <pthread.h>
+#include <ucontext.h>
 #endif
 
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 #include <map>
 
 #endif
