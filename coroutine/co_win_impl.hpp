@@ -80,6 +80,11 @@ void basecoroutine<T>::resume(int co_id) {
 			iter->second->_status = COROUTINE_RUNNING;
 			schedule._cur_co = iter->second;
 			::SwitchToFiber(schedule._cur_co->_ctx);
+			if (schedule._cur_co->_status == COROUTINE_DEAD) {
+				schedule._co[mod].erase(co_id);
+				free(schedule._cur_co);
+			}
+			schedule._cur_co = 0;
 			break;
 		}
 	}
@@ -90,7 +95,6 @@ void basecoroutine<T>::yield() {
 	_schedule_& schedule = gschedule;
 	if (schedule._cur_co) {
 		schedule._cur_co->_status = COROUTINE_SUSPEND;
-		schedule._cur_co = 0;
 		::SwitchToFiber(schedule._mainctx);
 	}
 }
@@ -100,10 +104,7 @@ void __stdcall pub_coroutine(LPVOID p) {
 	_schedule_& schedule = gschedule;
 	if (schedule._cur_co) {
 		(schedule._cur_co->_function)(schedule._cur_co->_data);
-		int mod = schedule._cur_co->_id % 1024;
-		schedule._co[mod].erase(schedule._cur_co->_id);
-		free(schedule._cur_co);
-		schedule._cur_co = 0;
+		schedule._cur_co->_status = COROUTINE_DEAD;
 		::SwitchToFiber(schedule._mainctx);
 	}
 }

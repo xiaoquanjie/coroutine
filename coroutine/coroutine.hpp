@@ -8,6 +8,7 @@ typedef void(*_coroutine_func_)(void*ud);
 #define COROUTINE_READY   (1)
 #define COROUTINE_RUNNING (2)
 #define COROUTINE_SUSPEND (3)
+#define COROUTINE_DEAD	  (4)
 
 #ifdef M_PLATFORM_WIN
 struct _coroutine_ {

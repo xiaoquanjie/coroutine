@@ -24,21 +24,18 @@ void coroutine_test(void* p) {
 	static int i = 1;
 	cout << "this is sub coroutine " << i << endl;
 	++i;
-	//Coroutine::yield();
+	Coroutine::yield();
 }
 
 int main() {
 
-	int co_count = 200;
+	int co_count = 2;
 	Coroutine::initEnv();
 	for (int i = 0; i < co_count; ++i) {
 		int id = Coroutine::create(coroutine_test, 0);
 	}
 	print_clock(true);
 	for (int i = 1; i <= co_count/*1000000*/; ++i) {
-		//int mod = i % 200;
-		//if (mod == 0)
-		//	mod = 1;
 		cout << "this is main coroutine" << endl;
 		Coroutine::resume(i);
 	}
