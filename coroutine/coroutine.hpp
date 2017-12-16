@@ -126,6 +126,14 @@ public:
 	static void resume(int co_id);
 	// yield
 	static void yield();
+	// current coroutine id
+	static unsigned int curid() {
+		_schedule_& schedule = gschedule;
+		if (schedule._cur_co) {
+			return schedule._cur_co->_id;
+		}
+		return 0;
+	}
 
 protected:
 	static unsigned int _stack_size;
@@ -155,6 +163,9 @@ public:
 	// yield
 	static void yield() {
 		return basecoroutine::yield();
+	}
+	static unsigned int curid() {
+		return basecoroutine::curid();
 	}
 };
 

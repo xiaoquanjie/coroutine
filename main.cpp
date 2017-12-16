@@ -20,23 +20,42 @@ void print_clock(bool beg) {
 	}
 }
 
+template<typename T>
+void print_c(const T& t) {
+	for (typename T::const_iterator iter = t.begin(); iter != t.end(); ++iter) {
+		cout << iter->first << " " << iter->second << endl;
+	}
+}
+
 void coroutine_test(void* p) {
-	static int i = 1;
-	//cout << "this is sub coroutine " << i << endl;
-	++i;
-	Coroutine::resume(2);
+	int id = Coroutine::curid();
+	cout << "this is sub coroutine " << id << endl;
+	std::map<int, int> m1;
+	m1[3] = 3;
+	m1[1] = 1;
+	m1[2] = 2;
+	print_c(m1);
+	Coroutine::yield();
+	cout << "this is sub coroutine " << id << endl;
+	m1[4] = 4;
+	m1[5] = 5;
+	print_c(m1);
 }
 
 int main() {
 
-	int co_count = 200000;
+	int co_count = 20;
 	Coroutine::initEnv();
 	for (int i = 0; i < co_count; ++i) {
 		int id = Coroutine::create(coroutine_test, 0);
 	}
 	print_clock(true);
 	for (int i = 1; i <= co_count/*1000000*/; ++i) {
-		//cout << "this is main coroutine" << endl;
+		cout << "this is main coroutine" << endl;
+		Coroutine::resume(i);
+	}
+	for (int i = 1; i <= co_count/*1000000*/; ++i) {
+		cout << "this is main coroutine" << endl;
 		Coroutine::resume(i);
 	}
 	print_clock(false);
