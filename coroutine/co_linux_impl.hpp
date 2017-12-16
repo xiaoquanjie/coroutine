@@ -63,6 +63,9 @@ void basecoroutine<T>::close() {
 template<typename T>
 void basecoroutine<T>::resume(int co_id) {
 	_schedule_& schedule = gschedule;
+	if (schedule._cur_co) {
+		return;
+	}
 	int mod = co_id % 1024;
 	CoroutineMap::iterator iter = schedule._co[mod].find(co_id);
 	if (iter != schedule._co[mod].end()) {
@@ -74,6 +77,12 @@ void basecoroutine<T>::resume(int co_id) {
 			iter->second->_status = COROUTINE_RUNNING;
 			schedule._cur_co = co;
 			swapcontext(&schedule._mainctx, &schedule._cur_co->_ctx);
+			if (schedule._cur_co->_status == COROUTINE_DEAD) {
+				schedule._co[mod].erase(co_id);
+				free(schedule._cur_co->_stack);
+				free(schedule._cur_co);
+			}
+			schedule._cur_co = 0;
 			break;
 		}
 	}
@@ -86,7 +95,6 @@ void basecoroutine<T>::yield() {
 		_coroutine_* co = schedule._cur_co;
 		save_stack<0>(co, schedule._stack + M_COROUTINE_STACK_SIZE);
 		co->_status = COROUTINE_SUSPEND;
-		schedule._cur_co = 0;
 		swapcontext(&co->_ctx, &schedule._mainctx);
 	}
 }
@@ -96,11 +104,8 @@ void pub_coroutine() {
 	_schedule_& schedule = gschedule;
 	if (schedule._cur_co) {
 		(schedule._cur_co->_function)(schedule._cur_co->_data);
-		int mod = schedule._cur_co->_id % 1024;
-		schedule._co[mod].erase(schedule._cur_co->_id);
-		free(schedule._cur_co->_stack);
-		free(schedule._cur_co);
-		schedule._cur_co = 0;
+		schedule._cur_co->_status = COROUTINE_DEAD;
+		swapcontext(&schedule._cur_co->_ctx, &schedule._mainctx);
 	}
 }
 

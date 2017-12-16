@@ -22,21 +22,21 @@ void print_clock(bool beg) {
 
 void coroutine_test(void* p) {
 	static int i = 1;
-	cout << "this is sub coroutine " << i << endl;
+	//cout << "this is sub coroutine " << i << endl;
 	++i;
-	Coroutine::yield();
+	Coroutine::resume(2);
 }
 
 int main() {
 
-	int co_count = 2;
+	int co_count = 200000;
 	Coroutine::initEnv();
 	for (int i = 0; i < co_count; ++i) {
 		int id = Coroutine::create(coroutine_test, 0);
 	}
 	print_clock(true);
 	for (int i = 1; i <= co_count/*1000000*/; ++i) {
-		cout << "this is main coroutine" << endl;
+		//cout << "this is main coroutine" << endl;
 		Coroutine::resume(i);
 	}
 	print_clock(false);

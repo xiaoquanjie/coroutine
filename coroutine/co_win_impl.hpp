@@ -71,6 +71,9 @@ void basecoroutine<T>::close() {
 template<typename T>
 void basecoroutine<T>::resume(int co_id) {
 	_schedule_& schedule = gschedule;
+	if (schedule._cur_co) {
+		return;
+	}
 	int mod = co_id % 1024;
 	CoroutineMap::iterator iter = schedule._co[mod].find(co_id);
 	if (iter != schedule._co[mod].end()) {
