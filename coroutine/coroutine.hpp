@@ -57,7 +57,7 @@ struct _schedule_ {
 #endif
 
 #ifdef M_PLATFORM_WIN
-template<typename T>
+template<typename T,int N=0>
 struct _tlsdata_ {
 	struct _init_ {
 		DWORD _tkey;
@@ -82,7 +82,7 @@ protected:
 	static _init_ _data;
 };
 #else
-template<typename T>
+template<typename T, int N = 0>
 struct _tlsdata_ {
 	struct _init_ {
 		pthread_key_t _tkey;
@@ -108,8 +108,8 @@ protected:
 };
 #endif
 
-template<typename T>
-typename _tlsdata_<T>::_init_ _tlsdata_<T>::_data;
+template<typename T,int N>
+typename _tlsdata_<T,N>::_init_ _tlsdata_<T,N>::_data;
 
 #define gschedule _tlsdata_<_schedule_>::data()
 
@@ -173,8 +173,121 @@ public:
 	}
 };
 
+struct co_task {
+	void* p;
+	void(*func)(void*);
+};
+
+struct co_task_wrapper {
+	int co_id;
+	co_task** task;
+};
+
+typedef std::list<co_task*> tasklist;
+typedef std::list<co_task_wrapper*> taskwrapperlist;
+
+#define gfreetasklist _tlsdata_<tasklist,0>::data()
+#define gworktasklist _tlsdata_<tasklist,1>::data()
+#define gfreecolist	_tlsdata_<taskwrapperlist,0>::data()
+#define gallcolist _tlsdata_<taskwrapperlist,1>::data()
+
+class CoroutineTask {
+public:
+	static void doTask() {
+		if (Coroutine::curid() == 0) {
+			co_task* task = _get_task();
+			if (task) {
+				co_task_wrapper* wrapper = _get_co_task_wrapper();
+				wrapper->task = &task;
+				Coroutine::resume(wrapper->co_id);
+			}
+		}
+	}
+
+	static void addTask(void(*func)(void*), void*p) {
+		co_task* task = 0;
+		tasklist& tl = gfreetasklist;
+		if (!tl.empty()) {
+			task = tl.front();
+			tl.pop_front();
+		}
+		else {
+			task = (co_task*)malloc(sizeof(co_task));
+		}
+		task->func = func;
+		task->p = p;
+		gworktasklist.push_back(task);
+	}
+
+	static void clrTask() {
+		if (Coroutine::curid() == 0) {
+			tasklist& ftl = gfreetasklist;
+			for (tasklist::iterator iter = ftl.begin(); iter != ftl.end();
+				++iter)
+				free(*iter);
+			ftl.clear();
+			tasklist& wtl = gworktasklist;
+			for (tasklist::iterator iter = wtl.begin(); iter != wtl.end();
+				++iter)
+				free(*iter);
+			wtl.clear();
+			taskwrapperlist& wtw = gallcolist;
+			for (taskwrapperlist::iterator iter = wtw.begin(); iter != wtw.end();
+				++iter)
+				Coroutine::destroy((*iter)->co_id);
+			wtw.clear();
+		}
+	}
+
+private:
+
+	static co_task* _get_task() {
+		tasklist& tl = gworktasklist;
+		if (tl.empty()) {
+			return 0;
+		}
+		else {
+			co_task* task = tl.front();
+			tl.pop_front();
+			return task;
+		}
+	}
+
+	static co_task_wrapper* _get_co_task_wrapper() {
+		co_task_wrapper* wrapper = 0;
+		taskwrapperlist& tw = gfreecolist;
+		if (!tw.empty()) {
+			wrapper = tw.front();
+			tw.pop_front();
+		}
+		else {
+			wrapper = (co_task_wrapper*)malloc(sizeof(co_task_wrapper));
+			wrapper->co_id = Coroutine::create(_co_task_func_, wrapper);
+			gallcolist.push_back(wrapper);
+		}
+		wrapper->task = 0;
+		return wrapper;
+	}
+
+	static void _co_task_func_(void* p) {
+		co_task_wrapper* wrapper = (co_task_wrapper*)p;
+		tasklist& tl = gfreetasklist;
+		taskwrapperlist& ftl = gfreecolist;
+		while (wrapper->task) {
+			co_task* task = *(wrapper->task);
+			if (task) {
+				task->func(task->p);
+				tl.push_back(task);
+			}
+			ftl.push_back(wrapper);
+			Coroutine::yield();
+		}
+		free(wrapper);
+	}
+};
+
 M_COROUTINE_NAMESPACE_END
 #endif // end for M_COROUTINE_COROUTINE_INCLUDE
 
-#include "co_linux_impl.hpp"
-#include "co_win_impl.hpp"
+#include "coroutine/co_linux_impl.hpp"
+#include "coroutine/co_win_impl.hpp"
