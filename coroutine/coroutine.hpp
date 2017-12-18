@@ -1,7 +1,7 @@
 #ifndef M_COROUTINE_COROUTINE_INCLUDE
 #define M_COROUTINE_COROUTINE_INCLUDE
 
-#include "config.hpp"
+#include "coroutine/config.hpp"
 M_COROUTINE_NAMESPACE_BEGIN
 
 typedef void(*_coroutine_func_)(void*ud);
@@ -134,6 +134,7 @@ public:
 		}
 		return 0;
 	}
+	static void destroy(int co_id);
 
 protected:
 	static unsigned int _stack_size;
@@ -166,6 +167,9 @@ public:
 	}
 	static unsigned int curid() {
 		return basecoroutine::curid();
+	}
+	static void destroy(int co_id) {
+		basecoroutine::destroy(co_id);
 	}
 };
 

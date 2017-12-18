@@ -99,6 +99,20 @@ void basecoroutine<T>::yield() {
 	}
 }
 
+template<typename T>
+void basecoroutine<T>::destroy(int co_id) {
+	_schedule_& schedule = gschedule;
+	if (!schedule._cur_co || schedule._cur_co->_id != co_id) {
+		int mod = co_id % 1024;
+		CoroutineMap::iterator iter = schedule._co[mod].find(co_id);
+		if (iter != schedule._co[mod].end()) {
+			free(iter->second->_stack);
+			free(iter->second);
+			schedule._co[mod].erase(iter);
+		}
+	}
+}
+
 template<int N>
 void pub_coroutine() {
 	_schedule_& schedule = gschedule;

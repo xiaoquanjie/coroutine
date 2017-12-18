@@ -102,6 +102,20 @@ void basecoroutine<T>::yield() {
 	}
 }
 
+template<typename T>
+void basecoroutine<T>::destroy(int co_id) {
+	_schedule_& schedule = gschedule;
+	if (!schedule._cur_co || schedule._cur_co->_id != co_id) {
+		int mod = co_id % 1024;
+		CoroutineMap::iterator iter = schedule._co[mod].find(co_id);
+		if (iter != schedule._co[mod].end()) {
+			::DeleteFiber(iter->second->_ctx);
+			free(iter->second);
+			schedule._co[mod].erase(iter);
+		}
+	}
+}
+
 template<int N>
 void __stdcall pub_coroutine(LPVOID p) {
 	_schedule_& schedule = gschedule;

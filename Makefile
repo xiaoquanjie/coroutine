@@ -1,5 +1,5 @@
 ALL_DIR_SRC 	= ./
-INCLUDES 	= -Icoroutine
+INCLUDES 	= -I./
 CPPFLAGS	= -pthread -gdwarf-2
 
 all : project

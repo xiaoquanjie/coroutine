@@ -1,6 +1,7 @@
-#include "coroutine.hpp"
+#include "coroutine/coroutine.hpp"
 #include <iostream>
 #include <time.h>
+#include <list>
 
 using namespace std;
 using namespace coroutine;
@@ -42,27 +43,63 @@ void coroutine_test(void* p) {
 	print_c(m1);
 }
 
+enum {
+	task_free,
+	task_ready,
+	task_over,
+};
+
+struct co_task {
+	int id;
+	int status;
+	void* param;
+	void(*fun)(void*);
+};
+
+void co_task_func(void* p) {
+	co_task* task = (co_task*)p;
+	while (task->fun) {
+		task->fun(task->param);
+		Coroutine::yield();
+	}
+}
+
+void func(void*p) {
+	cout << "nihao" << endl;
+}
+
+class CoroutinePool {
+public:
+	static void addTask(void(*fun)(void*), void*p) {
+		
+	}
+
+protected:
+	co_task* _getTask(void(*fun)(void*), void*p) {
+
+	}
+
+private:
+	std::list<co_task*> _freelist;
+	std::list<co_task*> _worklist;
+
+	std::map<int, co_task*> _tasks;
+	std::list<int> _idlist;
+};
+
 int main() {
 
 	int co_count = 20;
 	Coroutine::initEnv();
-	for (int i = 0; i < co_count; ++i) {
-		int id = Coroutine::create(coroutine_test, 0);
-	}
-	print_clock(true);
-	for (int i = 1; i <= co_count/*1000000*/; ++i) {
-		cout << "this is main coroutine" << endl;
-		Coroutine::resume(i);
-	}
-	for (int i = 1; i <= co_count/*1000000*/; ++i) {
-		cout << "this is main coroutine" << endl;
-		Coroutine::resume(i);
-	}
-	print_clock(false);
+	
+	std::list<int> idlist;
+	int id = Coroutine::create(co_task_func, 0);
+	idlist.push_back(id);
+	id = Coroutine::create(co_task_func, 0);
+	idlist.push_back(id);
+	id = Coroutine::create(co_task_func, 0);
+	idlist.push_back(id);
+
 	Coroutine::close();
-	cout << "all finish" << endl;
-
-	//memcpy()
-
 	return 0;
 }
