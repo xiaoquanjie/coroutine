@@ -146,7 +146,7 @@ public:
 		if (schedule._curco) {
 			return schedule._curco->_id;
 		}
-		return 0;
+		return -1;
 	}
 	static void destroy(int co_id);
 
@@ -233,13 +233,32 @@ typedef slist<co_task_wrapper*> taskwrapperlist;
 class CoroutineTask {
 public:
 	static void doTask() {
-		if (Coroutine::curid() == 0) {
+		if (Coroutine::curid() == -1) {
 			co_task* task = _get_task();
 			if (task) {
 				co_task_wrapper* wrapper = _get_co_task_wrapper();
 				wrapper->task = &task;
 				Coroutine::resume(wrapper->co_id);
 			}
+		}
+	}
+
+	static void doTask(void(*func)(void*), void*p) {
+		if (Coroutine::curid() == -1) {
+			co_task* task = 0;
+			tasklist& tl = gfreetasklist;
+			if (!tl.empty()) {
+				task = tl.front();
+				tl.pop_front();
+			}
+			else {
+				task = (co_task*)malloc(sizeof(co_task));
+			}
+			task->func = func;
+			task->p = p;
+			co_task_wrapper* wrapper = _get_co_task_wrapper();
+			wrapper->task = &task;
+			Coroutine::resume(wrapper->co_id);
 		}
 	}
 
@@ -259,7 +278,7 @@ public:
 	}
 
 	static void clrTask() {
-		if (Coroutine::curid() == 0) {
+		if (Coroutine::curid() == -1) {
 			tasklist& ftl = gfreetasklist;
 			while (ftl.size()) {
 				free(ftl.front());

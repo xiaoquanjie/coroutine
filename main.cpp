@@ -61,8 +61,9 @@ int main() {
 	
 	print_clock(true);
 	for (int i = 0; i < 1000000; ++i) {
-		CoroutineTask::addTask(func, 0);
-		CoroutineTask::doTask();
+		//CoroutineTask::addTask(func, 0);
+		//CoroutineTask::doTask();
+		CoroutineTask::doTask(func, 0);
 	}
 	print_clock(false);
 
