@@ -11,11 +11,11 @@ template<int N>
 void save_stack(_coroutine_* c, char* top);
 
 template<typename T>
-bool basecoroutine<T>::initEnv(unsigned int stack_size) {
-	if (_stack_size == 0)
-		_stack_size = stack_size;
+bool basecoroutine<T>::initEnv(unsigned int stack_size, bool pri_stack) {
 	_schedule_& schedule = gschedule;
 	if (schedule._index == -1) {
+		schedule._pri_stack = pri_stack;
+		gpristacksize = stack_size;
 		schedule._cur_co = 0;
 		schedule._index = 1;
 	}
@@ -27,18 +27,26 @@ int basecoroutine<T>::create(_coroutine_func_ routine, void* data) {
 	if (schedule._index != -1) {
 		int index = schedule._index++;
 		_coroutine_* co = (_coroutine_*)malloc(sizeof(_coroutine_));
+		assert(getcontext(&co->_ctx) == 0);
+		schedule._co[index % 1024].insert(std::make_pair(index, co));
 		co->_function = routine;
 		co->_data = data;
 		co->_status = COROUTINE_READY;
 		co->_id = index;
-		co->_stack = 0;
-		co->_cap = 0;
-		co->_size = 0;
-		schedule._co[index % 1024].insert(std::make_pair(index, co));
-		assert(getcontext(&co->_ctx) == 0);
-		co->_ctx.uc_stack.ss_sp = schedule._stack;
-		co->_ctx.uc_stack.ss_size = M_COROUTINE_STACK_SIZE;
 		co->_ctx.uc_link = &schedule._mainctx;
+		co->_size = 0;
+		if (schedule._pri_stack) {
+			co->_cap = gpristacksize;
+			co->_stack = (char*)malloc(co->_cap);
+			co->_ctx.uc_stack.ss_sp = co->_stack;
+			co->_ctx.uc_stack.ss_size = co->_cap;
+		}
+		else {
+			co->_stack = 0;
+			co->_cap = 0;
+			co->_ctx.uc_stack.ss_sp = schedule._stack;
+			co->_ctx.uc_stack.ss_size = M_COROUTINE_STACK_SIZE;
+		}
 		makecontext(&co->_ctx, pub_coroutine<0>, 0);
 		return index;
 	}
@@ -72,7 +80,8 @@ void basecoroutine<T>::resume(int co_id) {
 		_coroutine_* co = iter->second;
 		switch (iter->second->_status){
 		case COROUTINE_SUSPEND:
-			memcpy(schedule._stack + M_COROUTINE_STACK_SIZE - co->_size, co->_stack, co->_size);
+			if (!schedule._pri_stack)
+				memcpy(schedule._stack + M_COROUTINE_STACK_SIZE - co->_size, co->_stack, co->_size);
 		case COROUTINE_READY:
 			iter->second->_status = COROUTINE_RUNNING;
 			schedule._cur_co = co;
@@ -93,7 +102,8 @@ void basecoroutine<T>::yield() {
 	_schedule_& schedule = gschedule;
 	if (schedule._cur_co) {
 		_coroutine_* co = schedule._cur_co;
-		save_stack<0>(co, schedule._stack + M_COROUTINE_STACK_SIZE);
+		if (!schedule._pri_stack)
+			save_stack<0>(co, schedule._stack + M_COROUTINE_STACK_SIZE);
 		co->_status = COROUTINE_SUSPEND;
 		swapcontext(&co->_ctx, &schedule._mainctx);
 	}

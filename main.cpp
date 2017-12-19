@@ -52,7 +52,7 @@ void func(void*p) {
 int main() {
 
 	int co_count = 20;
-	Coroutine::initEnv();
+	Coroutine::initEnv(128*1024,false);
 	
 	CoroutineTask::addTask(func, 0);
 	CoroutineTask::addTask(func, 0);

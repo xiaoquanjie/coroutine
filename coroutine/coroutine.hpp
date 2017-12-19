@@ -47,7 +47,9 @@ struct _schedule_ {
 	_schedule_() {
 		_cur_co = 0;
 		_index = -1;
+		_pri_stack = false;
 	}
+	bool _pri_stack;
 	int	_index;
 	ucontext_t _mainctx;
 	_coroutine_* _cur_co;
@@ -112,12 +114,13 @@ template<typename T,int N>
 typename _tlsdata_<T,N>::_init_ _tlsdata_<T,N>::_data;
 
 #define gschedule _tlsdata_<_schedule_>::data()
+#define gpristacksize _tlsdata_<unsigned int>::data()
 
 template<typename T>
 class basecoroutine {
 public:
 	// init environment
-	static bool initEnv(unsigned int stack_size = 128 * 1204);
+	static bool initEnv(unsigned int stack_size = 128 * 1204, bool pri_stack = false);
 	// create one new coroutine
 	static int create(_coroutine_func_ routine, void* data);
 	// close
@@ -135,19 +138,14 @@ public:
 		return 0;
 	}
 	static void destroy(int co_id);
-
-protected:
-	static unsigned int _stack_size;
 };
 
-template<typename T>
-unsigned int basecoroutine<T>::_stack_size = 0;
-
+// private stack is not useful for windows fiber
 class Coroutine : public basecoroutine<Coroutine>{
 public:
 	// init environment
-	static bool initEnv(unsigned int stack_size = 128 * 1204) {
-		return basecoroutine::initEnv(stack_size);
+	static bool initEnv(unsigned int stack_size = 128 * 1204,bool pri_stack = false) {
+		return basecoroutine::initEnv(stack_size, pri_stack);
 	}
 	// create one new coroutine
 	static int create(_coroutine_func_ routine, void* data) {
@@ -273,8 +271,9 @@ private:
 		co_task_wrapper* wrapper = (co_task_wrapper*)p;
 		tasklist& tl = gfreetasklist;
 		taskwrapperlist& ftl = gfreecolist;
+		co_task* task = 0;
 		while (wrapper->task) {
-			co_task* task = *(wrapper->task);
+			task = *(wrapper->task);
 			if (task) {
 				task->func(task->p);
 				tl.push_back(task);

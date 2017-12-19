@@ -8,11 +8,10 @@ template<int N>
 void __stdcall pub_coroutine(LPVOID p);
 
 template<typename T>
-bool basecoroutine<T>::initEnv(unsigned int stack_size) {
-	if (_stack_size == 0)
-		_stack_size = stack_size;
+bool basecoroutine<T>::initEnv(unsigned int stack_size, bool pri_stack) {
 	_schedule_& schedule = gschedule;
 	if (!schedule._mainctx) {
+		gpristacksize = stack_size;
 		LPVOID ctx = ::ConvertThreadToFiberEx(0, FIBER_FLAG_FLOAT_SWITCH);
 		if (!ctx) {
 			DWORD error = ::GetLastError();
@@ -29,7 +28,7 @@ bool basecoroutine<T>::initEnv(unsigned int stack_size) {
 
 template<typename T>
 int basecoroutine<T>::create(_coroutine_func_ routine, void* data) {
-	LPVOID ctx = ::CreateFiberEx(_stack_size, 0, FIBER_FLAG_FLOAT_SWITCH, pub_coroutine<0>, 0);
+	LPVOID ctx = ::CreateFiberEx(gpristacksize, 0, FIBER_FLAG_FLOAT_SWITCH, pub_coroutine<0>, 0);
 	if (ctx) {
 		_coroutine_* co = (_coroutine_*)malloc(sizeof(_coroutine_));
 		if (co) {
