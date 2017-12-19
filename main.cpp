@@ -44,23 +44,29 @@ void coroutine_test(void* p) {
 }
 
 void func(void*p) {
-	cout << "nihao " << Coroutine::curid() << endl;
-	Coroutine::yield();
+	//cout << "nihao " << Coroutine::curid() << endl;
+	//Coroutine::yield();
 }
 
 
 int main() {
 
 	int co_count = 20;
-	Coroutine::initEnv(128*1024,false);
+	Coroutine::initEnv(128*1024,true);
 	
+	print_clock(true);
+	for (int i = 0; i < 1000000; ++i) {
+		CoroutineTask::addTask(func, 0);
+		CoroutineTask::doTask();
+	}
+	print_clock(false);
+	/*CoroutineTask::addTask(func, 0);
 	CoroutineTask::addTask(func, 0);
 	CoroutineTask::addTask(func, 0);
-	CoroutineTask::addTask(func, 0);
 	CoroutineTask::doTask();
 	CoroutineTask::doTask();
 	CoroutineTask::doTask();
-	CoroutineTask::doTask();
+	CoroutineTask::doTask();*/
 	CoroutineTask::clrTask();
 	
 	Coroutine::close();

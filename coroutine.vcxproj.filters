@@ -35,5 +35,8 @@
     <ClInclude Include="coroutine\coroutine.hpp">
       <Filter>coroutine</Filter>
     </ClInclude>
+    <ClInclude Include="coroutine\slist.hpp">
+      <Filter>coroutine</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

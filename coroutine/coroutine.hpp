@@ -2,6 +2,7 @@
 #define M_COROUTINE_COROUTINE_INCLUDE
 
 #include "coroutine/config.hpp"
+#include "coroutine/slist.hpp"
 M_COROUTINE_NAMESPACE_BEGIN
 
 typedef void(*_coroutine_func_)(void*ud);
@@ -181,8 +182,8 @@ struct co_task_wrapper {
 	co_task** task;
 };
 
-typedef std::list<co_task*> tasklist;
-typedef std::list<co_task_wrapper*> taskwrapperlist;
+typedef slist<co_task*> tasklist;
+typedef slist<co_task_wrapper*> taskwrapperlist;
 
 #define gfreetasklist _tlsdata_<tasklist,0>::data()
 #define gworktasklist _tlsdata_<tasklist,1>::data()
@@ -220,20 +221,22 @@ public:
 	static void clrTask() {
 		if (Coroutine::curid() == 0) {
 			tasklist& ftl = gfreetasklist;
-			for (tasklist::iterator iter = ftl.begin(); iter != ftl.end();
-				++iter)
-				free(*iter);
-			ftl.clear();
+			while (ftl.size()) {
+				free(ftl.front());
+				ftl.pop_front();
+			}
 			tasklist& wtl = gworktasklist;
-			for (tasklist::iterator iter = wtl.begin(); iter != wtl.end();
-				++iter)
-				free(*iter);
-			wtl.clear();
+			while (wtl.size()) {
+				free(wtl.front());
+				wtl.pop_front();
+			}
 			taskwrapperlist& wtw = gallcolist;
-			for (taskwrapperlist::iterator iter = wtw.begin(); iter != wtw.end();
-				++iter)
-				Coroutine::destroy((*iter)->co_id);
-			wtw.clear();
+			while (wtw.size()) {
+				co_task_wrapper* wrapper = wtw.front();
+				Coroutine::destroy(wrapper->co_id);
+				free(wrapper);
+				wtw.pop_front();
+			}
 		}
 	}
 
