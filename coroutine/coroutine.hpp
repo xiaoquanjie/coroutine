@@ -11,6 +11,8 @@ typedef void(*_coroutine_func_)(void*ud);
 #define COROUTINE_SUSPEND (3)
 #define COROUTINE_DEAD	  (4)
 
+#define DEFAULT_COROUTINE (1024)
+
 #ifdef M_PLATFORM_WIN
 struct _coroutine_ {
 	int _id;
@@ -22,14 +24,18 @@ struct _coroutine_ {
 typedef std::map<int, _coroutine_*> CoroutineMap;
 struct _schedule_ {
 	_schedule_() {
-		_mainctx = 0;
-		_index = 0;
-		_cur_co = 0;
+		_cap = 0;
+		_nco = 0;
+		_curco = 0;
+		_ctx = 0;
+		_co = 0;
 	}
-	int _index;
-	LPVOID _mainctx;
-	_coroutine_* _cur_co;
-	CoroutineMap _co[1024];
+	int _cap;
+	int _nco;
+	LPVOID _ctx;
+	_coroutine_** _co;
+	_coroutine_* _curco;
+	slist<int> _freeid;
 };
 #else
 #define M_COROUTINE_STACK_SIZE  4*1024*1024
@@ -46,21 +52,25 @@ struct _coroutine_ {
 typedef std::map<int, _coroutine_*> CoroutineMap;
 struct _schedule_ {
 	_schedule_() {
-		_cur_co = 0;
-		_index = -1;
+		_cap = 0;
+		_nco = 0;
+		_curco = 0;
+		_co = 0;
 		_pri_stack = false;
 	}
+	int _cap;
+	int _nco;
 	bool _pri_stack;
-	int	_index;
-	ucontext_t _mainctx;
-	_coroutine_* _cur_co;
+	ucontext_t _ctx;
+	_coroutine_** _co;
+	_coroutine_* _curco;
+	slist<int> _freeid;
 	char _stack[M_COROUTINE_STACK_SIZE];
-	CoroutineMap _co[1024];
 };
 #endif
 
 #ifdef M_PLATFORM_WIN
-template<typename T,int N=0>
+template<typename T, int N = 0>
 struct _tlsdata_ {
 	struct _init_ {
 		DWORD _tkey;
@@ -111,8 +121,8 @@ protected:
 };
 #endif
 
-template<typename T,int N>
-typename _tlsdata_<T,N>::_init_ _tlsdata_<T,N>::_data;
+template<typename T, int N>
+typename _tlsdata_<T, N>::_init_ _tlsdata_<T, N>::_data;
 
 #define gschedule _tlsdata_<_schedule_>::data()
 #define gpristacksize _tlsdata_<unsigned int>::data()
@@ -133,19 +143,49 @@ public:
 	// current coroutine id
 	static unsigned int curid() {
 		_schedule_& schedule = gschedule;
-		if (schedule._cur_co) {
-			return schedule._cur_co->_id;
+		if (schedule._curco) {
+			return schedule._curco->_id;
 		}
 		return 0;
 	}
 	static void destroy(int co_id);
+
+private:
+	static _coroutine_* _alloc_co_(_coroutine_func_ routine, void* data) {
+		_schedule_& schedule = gschedule;
+		_coroutine_* co = (_coroutine_*)malloc(sizeof(_coroutine_));
+		co->_function = routine;
+		co->_data = data;
+		co->_status = COROUTINE_READY;
+		if (!schedule._freeid.empty()) {
+			int id = schedule._freeid.front();
+			schedule._freeid.pop_front();
+			schedule._co[id] = co;
+			co->_id = id;
+		}
+		else {
+			if (schedule._nco >= schedule._cap) {
+				schedule._co = (_coroutine_**)realloc(schedule._co, schedule._cap * 2 * sizeof(_coroutine_*));
+				memset(schedule._co + schedule._cap, 0, schedule._cap * sizeof(_coroutine_*));
+				schedule._co[schedule._cap] = co;
+				schedule._cap *= 2;
+				co->_id = schedule._nco++;
+			}
+			else {
+				int id = schedule._nco++;
+				schedule._co[id] = co;
+				co->_id = id;
+			}
+		}
+		return co;
+	}
 };
 
-// private stack is not useful for windows fiber
-class Coroutine : public basecoroutine<Coroutine>{
+// private stack is invalid for windows fiber
+class Coroutine : public basecoroutine<Coroutine> {
 public:
 	// init environment
-	static bool initEnv(unsigned int stack_size = 128 * 1204,bool pri_stack = false) {
+	static bool initEnv(unsigned int stack_size = 128 * 1204, bool pri_stack = false) {
 		return basecoroutine::initEnv(stack_size, pri_stack);
 	}
 	// create one new coroutine

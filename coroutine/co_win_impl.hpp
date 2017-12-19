@@ -10,7 +10,7 @@ void __stdcall pub_coroutine(LPVOID p);
 template<typename T>
 bool basecoroutine<T>::initEnv(unsigned int stack_size, bool pri_stack) {
 	_schedule_& schedule = gschedule;
-	if (!schedule._mainctx) {
+	if (!schedule._ctx) {
 		gpristacksize = stack_size;
 		LPVOID ctx = ::ConvertThreadToFiberEx(0, FIBER_FLAG_FLOAT_SWITCH);
 		if (!ctx) {
@@ -18,9 +18,11 @@ bool basecoroutine<T>::initEnv(unsigned int stack_size, bool pri_stack) {
 			return false;
 		}
 		else {
-			schedule._mainctx = ctx;
-			schedule._index = 1;
-			schedule._cur_co = 0;
+			schedule._ctx = ctx;
+			schedule._curco = 0;
+			schedule._cap = DEFAULT_COROUTINE;
+			schedule._co = (_coroutine_**)malloc(sizeof(_coroutine_*)*schedule._cap);
+			memset(schedule._co, 0, sizeof(_coroutine_*)*schedule._cap);
 		}
 	}
 	return true;
@@ -30,19 +32,9 @@ template<typename T>
 int basecoroutine<T>::create(_coroutine_func_ routine, void* data) {
 	LPVOID ctx = ::CreateFiberEx(gpristacksize, 0, FIBER_FLAG_FLOAT_SWITCH, pub_coroutine<0>, 0);
 	if (ctx) {
-		_coroutine_* co = (_coroutine_*)malloc(sizeof(_coroutine_));
-		if (co) {
-			_schedule_& schedule = gschedule;
-			int index = schedule._index++;
-			co->_ctx = ctx;
-			co->_function = routine;
-			co->_data = data;
-			co->_status = COROUTINE_READY;
-			co->_id = index;
-			schedule._co[index % 1024].insert(std::make_pair(index, co));
-			return index;
-		}
-		return -1;
+		_coroutine_* co = _alloc_co_(routine, data);
+		co->_ctx = ctx;
+		return co->_id;
 	}
 	else {
 		DWORD error = ::GetLastError();
@@ -53,40 +45,49 @@ int basecoroutine<T>::create(_coroutine_func_ routine, void* data) {
 template<typename T>
 void basecoroutine<T>::close() {
 	_schedule_& schedule = gschedule;
-	for (int i = 0; i < 1024; ++i) {
-		for (CoroutineMap::iterator iter = schedule._co[i].begin();
-			iter != schedule._co[i].end(); ++iter) {
-			::DeleteFiber(iter->second->_ctx);
-			free(iter->second);
+	if (!schedule._curco) {
+		for (int i = 0; i < schedule._cap; ++i) {
+			_coroutine_* co = schedule._co[i];
+			if (co) {
+				::DeleteFiber(co->_ctx);
+				free(co);
+			}
 		}
-		schedule._co[i].clear();
+		schedule._freeid.clear();
+		schedule._nco = 0;
+		schedule._cap = 0;
+		schedule._ctx = 0;
+		schedule._curco = 0;
+		free(schedule._co);
+		schedule._co = 0;
+		::ConvertFiberToThread();
 	}
-	schedule._cur_co = 0;
-	schedule._index = 0;
-	schedule._mainctx = 0;
-	::ConvertFiberToThread();
 }
 
 template<typename T>
 void basecoroutine<T>::resume(int co_id) {
 	_schedule_& schedule = gschedule;
-	if (schedule._cur_co) {
+	if (schedule._curco) {
 		return;
 	}
-	int mod = co_id % 1024;
-	CoroutineMap::iterator iter = schedule._co[mod].find(co_id);
-	if (iter != schedule._co[mod].end()) {
-		switch (iter->second->_status) {
+	if (co_id < 0 || co_id >= schedule._cap) {
+		return;
+	}
+	_coroutine_* co = schedule._co[co_id];
+	if (co) {
+		switch (co->_status) {
 		case COROUTINE_READY:
 		case COROUTINE_SUSPEND:
-			iter->second->_status = COROUTINE_RUNNING;
-			schedule._cur_co = iter->second;
-			::SwitchToFiber(schedule._cur_co->_ctx);
-			if (schedule._cur_co->_status == COROUTINE_DEAD) {
-				schedule._co[mod].erase(co_id);
-				free(schedule._cur_co);
+			co->_status = COROUTINE_RUNNING;
+			schedule._curco = co;
+			::SwitchToFiber(co->_ctx);
+			if (co->_status == COROUTINE_DEAD) {
+				::DeleteFiber(co->_ctx);
+				free(co);
+				schedule._co[co_id] = 0;
+				schedule._freeid.push_back(co_id);
 			}
-			schedule._cur_co = 0;
+			schedule._curco = 0;
 			break;
 		}
 	}
@@ -95,22 +96,24 @@ void basecoroutine<T>::resume(int co_id) {
 template<typename T>
 void basecoroutine<T>::yield() {
 	_schedule_& schedule = gschedule;
-	if (schedule._cur_co) {
-		schedule._cur_co->_status = COROUTINE_SUSPEND;
-		::SwitchToFiber(schedule._mainctx);
+	if (schedule._curco) {
+		schedule._curco->_status = COROUTINE_SUSPEND;
+		::SwitchToFiber(schedule._ctx);
 	}
 }
 
 template<typename T>
 void basecoroutine<T>::destroy(int co_id) {
 	_schedule_& schedule = gschedule;
-	if (!schedule._cur_co || schedule._cur_co->_id != co_id) {
-		int mod = co_id % 1024;
-		CoroutineMap::iterator iter = schedule._co[mod].find(co_id);
-		if (iter != schedule._co[mod].end()) {
-			::DeleteFiber(iter->second->_ctx);
-			free(iter->second);
-			schedule._co[mod].erase(iter);
+	if (!schedule._curco || schedule._curco->_id != co_id) {
+		if (co_id >= 0 && co_id < schedule._cap) {
+			_coroutine_* co = schedule._co[co_id];
+			if (co) {
+				::DeleteFiber(co->_ctx);
+				free(co);
+				schedule._co[co_id] = 0;
+				schedule._freeid.push_back(co_id);
+			}
 		}
 	}
 }
@@ -118,10 +121,10 @@ void basecoroutine<T>::destroy(int co_id) {
 template<int N>
 void __stdcall pub_coroutine(LPVOID p) {
 	_schedule_& schedule = gschedule;
-	if (schedule._cur_co) {
-		(schedule._cur_co->_function)(schedule._cur_co->_data);
-		schedule._cur_co->_status = COROUTINE_DEAD;
-		::SwitchToFiber(schedule._mainctx);
+	if (schedule._curco) {
+		(schedule._curco->_function)(schedule._curco->_data);
+		schedule._curco->_status = COROUTINE_DEAD;
+		::SwitchToFiber(schedule._ctx);
 	}
 }
 

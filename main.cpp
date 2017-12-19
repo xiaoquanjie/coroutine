@@ -52,7 +52,12 @@ void func(void*p) {
 int main() {
 
 	int co_count = 20;
-	Coroutine::initEnv(128*1024,true);
+	Coroutine::initEnv(128*1024,false);
+	/*int id = Coroutine::create(func, 0);
+	int id1 = Coroutine::create(func, 0);
+	Coroutine::resume(id);
+	Coroutine::destroy(id);
+	id = Coroutine::create(func, 0);*/
 	
 	print_clock(true);
 	for (int i = 0; i < 1000000; ++i) {
@@ -60,14 +65,16 @@ int main() {
 		CoroutineTask::doTask();
 	}
 	print_clock(false);
+
+
 	/*CoroutineTask::addTask(func, 0);
 	CoroutineTask::addTask(func, 0);
 	CoroutineTask::addTask(func, 0);
 	CoroutineTask::doTask();
 	CoroutineTask::doTask();
 	CoroutineTask::doTask();
-	CoroutineTask::doTask();*/
-	CoroutineTask::clrTask();
+	CoroutineTask::doTask();
+	CoroutineTask::clrTask();*/
 	
 	Coroutine::close();
 	return 0;
