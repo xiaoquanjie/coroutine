@@ -1,22 +1,71 @@
 #ifndef M_COROUTINE_SLIST_INCLUDE
 #define M_COROUTINE_SLIST_INCLUDE
 
+#include <stdlib.h>
 #include "coroutine/config.hpp"
 M_COROUTINE_NAMESPACE_BEGIN
+
+template<typename T>
+struct _slist_node_ {
+	T val;
+	_slist_node_<T> *next;
+};
+
+template<typename T>
+struct slit_alloc {
+	inline static _slist_node_<T>* alloc() {
+		return (new _slist_node_<T>);
+	}
+};
+
+template<>
+struct slit_alloc<int> {
+	inline static _slist_node_<int>* alloc() {
+		return (_slist_node_<int>*)malloc(sizeof(_slist_node_<int>));
+	}
+};
+
+template<typename T>
+struct slit_alloc<T*> {
+	inline static _slist_node_<T*>* alloc() {
+		return (_slist_node_<T*>*)malloc(sizeof(_slist_node_<T*>));
+	}
+};
+
+template<typename T>
+struct slit_dealloc {
+	inline static void dealloc(void*p) {
+		delete ((_slist_node_<T>*)p);
+	}
+};
+
+template<>
+struct slit_dealloc<int> {
+	inline static void dealloc(void*p) {
+		free(p);
+	}
+};
+
+template<typename T>
+struct slit_dealloc<T*> {
+	inline static void dealloc(void*p) {
+		free(p);
+	}
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<class T>
 class slist
 {
 protected:
-	struct Node{
-		T val;
-		Node *next;
-	};
+	typedef _slist_node_<T> Node;
+
 public:
 	inline slist();
 
 	inline ~slist();
-	
+
 	inline void push_back(const T& t);
 
 	inline T front();
@@ -24,7 +73,7 @@ public:
 	inline void pop_front();
 
 	inline void clear();
-	
+
 	inline int size()const;
 
 	inline bool empty()const;
@@ -53,17 +102,17 @@ private:
 };
 
 template<class T>
-inline slist<T>::slist(){
+inline slist<T>::slist() {
 	_tail = _head = NULL;
 	_count = 0;
 }
 
 template<class T>
-inline slist<T>::~slist(){
+inline slist<T>::~slist() {
 	Node *p, *pnext;
-	for (p = _head; p != NULL; p = pnext){
+	for (p = _head; p != NULL; p = pnext) {
 		pnext = p->next;
-		delete p;
+		slit_dealloc<T>::dealloc(p);
 	}
 	_count = 0;
 	_tail = _head = 0;
@@ -71,7 +120,7 @@ inline slist<T>::~slist(){
 
 template<class T>
 inline void slist<T>::push_back(const T& t) {
-	Node* pnode = new Node;
+	Node* pnode = (Node*)slit_alloc<T>::alloc();
 	pnode->val = t;
 	pnode->next = 0;
 	if (_tail) {
@@ -94,7 +143,7 @@ template<class T>
 inline void slist<T>::pop_front() {
 	if (_head) {
 		Node* pnode = _head->next;
-		delete _head;
+		slit_dealloc<T>::dealloc(_head);
 		if (_head == _tail)
 			_tail = pnode;
 		_head = pnode;
@@ -103,7 +152,7 @@ inline void slist<T>::pop_front() {
 }
 
 template<class T>
-inline int slist<T>::size()const{
+inline int slist<T>::size()const {
 	return _count;
 }
 
@@ -119,7 +168,7 @@ inline void slist<T>::clear()
 	while (cur != NULL)
 	{
 		Node* next = cur->next;
-		free(cur);
+		delete (cur);
 		cur = next;
 	}
 	_head = NULL;
