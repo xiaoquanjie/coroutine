@@ -44,39 +44,47 @@ void coroutine_test(void* p) {
 }
 
 void func(void*p) {
+	/*while (true) {
+		Coroutine::yield();
+	}*/
 	//cout << "nihao " << Coroutine::curid() << endl;
 	//Coroutine::yield();
 }
 
+struct test_stru {
+	int i;
+	test_stru() {
+		cout << "con" << endl;
+	}
+	~test_stru() {
+		cout << "~con" << endl;
+	}
+	test_stru(const test_stru&o) {
+		cout << "copy con" << endl;
+		i = o.i;
+	}
+	test_stru& operator=(const test_stru&o) {
+		cout << "op =" << endl;
+		i = o.i;
+		return *this;
+	}
+};
 
 int main() {
 
 	int co_count = 20;
 	Coroutine::initEnv(128*1024,false);
-	/*int id = Coroutine::create(func, 0);
-	int id1 = Coroutine::create(func, 0);
-	Coroutine::resume(id);
-	Coroutine::destroy(id);
-	id = Coroutine::create(func, 0);*/
 	
 	print_clock(true);
+	int id = Coroutine::create(func, 0);
 	for (int i = 0; i < 1000000; ++i) {
 		//CoroutineTask::addTask(func, 0);
 		//CoroutineTask::doTask();
 		CoroutineTask::doTask(func, 0);
+		//Coroutine::resume(id);
 	}
 	print_clock(false);
 
-
-	/*CoroutineTask::addTask(func, 0);
-	CoroutineTask::addTask(func, 0);
-	CoroutineTask::addTask(func, 0);
-	CoroutineTask::doTask();
-	CoroutineTask::doTask();
-	CoroutineTask::doTask();
-	CoroutineTask::doTask();
-	CoroutineTask::clrTask();*/
-	
 	Coroutine::close();
 	return 0;
 }

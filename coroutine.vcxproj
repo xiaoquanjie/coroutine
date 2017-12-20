@@ -71,7 +71,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(IncludePath)</IncludePath>
+    <IncludePath>./;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -147,11 +147,13 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="base\config.hpp" />
+    <ClInclude Include="base\slist.hpp" />
+    <ClInclude Include="base\svector.hpp" />
     <ClInclude Include="coroutine\config.hpp" />
     <ClInclude Include="coroutine\coroutine.hpp" />
     <ClInclude Include="coroutine\co_linux_impl.hpp" />
     <ClInclude Include="coroutine\co_win_impl.hpp" />
-    <ClInclude Include="coroutine\slist.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

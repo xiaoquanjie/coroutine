@@ -1,8 +1,8 @@
-#ifndef M_COROUTINE_SLIST_INCLUDE
-#define M_COROUTINE_SLIST_INCLUDE
+#ifndef M_BASE_SLIST_INCLUDE
+#define M_BASE_SLIST_INCLUDE
 
-#include "coroutine/config.hpp"
-M_COROUTINE_NAMESPACE_BEGIN
+#include "base/config.hpp"
+M_BASE_NAMESPACE_BEGIN
 
 template<class T>
 class slist
@@ -143,5 +143,5 @@ inline void slist<T>::join(slist<T>& other) {
 	other._count = 0;
 }
 
-M_COROUTINE_NAMESPACE_END
+M_BASE_NAMESPACE_END
 #endif

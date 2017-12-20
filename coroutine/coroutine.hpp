@@ -2,7 +2,8 @@
 #define M_COROUTINE_COROUTINE_INCLUDE
 
 #include "coroutine/config.hpp"
-#include "coroutine/slist.hpp"
+#include "base/slist.hpp"
+#include "base/svector.hpp"
 M_COROUTINE_NAMESPACE_BEGIN
 
 typedef void(*_coroutine_func_)(void*ud);
@@ -35,7 +36,7 @@ struct _schedule_ {
 	LPVOID _ctx;
 	_coroutine_** _co;
 	_coroutine_* _curco;
-	slist<int> _freeid;
+	base::svector<int> _freeid;
 };
 #else
 #define M_COROUTINE_STACK_SIZE  4*1024*1024
@@ -64,7 +65,7 @@ struct _schedule_ {
 	ucontext_t _ctx;
 	_coroutine_** _co;
 	_coroutine_* _curco;
-	slist<int> _freeid;
+	base::svector<int> _freeid;
 	char _stack[M_COROUTINE_STACK_SIZE];
 };
 #endif
@@ -158,8 +159,8 @@ private:
 		co->_data = data;
 		co->_status = COROUTINE_READY;
 		if (!schedule._freeid.empty()) {
-			int id = schedule._freeid.front();
-			schedule._freeid.pop_front();
+			int id = schedule._freeid.back();
+			schedule._freeid.pop_back();
 			schedule._co[id] = co;
 			co->_id = id;
 		}
@@ -222,13 +223,15 @@ struct co_task_wrapper {
 	co_task** task;
 };
 
-typedef slist<co_task*> tasklist;
-typedef slist<co_task_wrapper*> taskwrapperlist;
+typedef base::slist<co_task*> tasklist;
+typedef base::svector<co_task*> taskvector;
+typedef base::slist<co_task_wrapper*> taskwrapperlist;
+typedef base::svector<co_task_wrapper*> taskwrappervector;
 
-#define gfreetasklist _tlsdata_<tasklist,0>::data()
-#define gworktasklist _tlsdata_<tasklist,1>::data()
-#define gfreecolist	_tlsdata_<taskwrapperlist,0>::data()
-#define gallcolist _tlsdata_<taskwrapperlist,1>::data()
+#define gfreetaskvec _tlsdata_<taskvector,0>::data()
+#define gworktasklist _tlsdata_<tasklist,0>::data()
+#define gfreecovec	_tlsdata_<taskwrappervector,0>::data()
+#define gallcolist _tlsdata_<taskwrapperlist,0>::data()
 
 class CoroutineTask {
 public:
@@ -246,10 +249,10 @@ public:
 	static void doTask(void(*func)(void*), void*p) {
 		if (Coroutine::curid() == -1) {
 			co_task* task = 0;
-			tasklist& tl = gfreetasklist;
+			taskvector& tl = gfreetaskvec;
 			if (!tl.empty()) {
-				task = tl.front();
-				tl.pop_front();
+				task = tl.back();
+				tl.pop_back();
 			}
 			else {
 				task = (co_task*)malloc(sizeof(co_task));
@@ -264,10 +267,10 @@ public:
 
 	static void addTask(void(*func)(void*), void*p) {
 		co_task* task = 0;
-		tasklist& tl = gfreetasklist;
+		taskvector& tl = gfreetaskvec;
 		if (!tl.empty()) {
-			task = tl.front();
-			tl.pop_front();
+			task = tl.back();
+			tl.pop_back();
 		}
 		else {
 			task = (co_task*)malloc(sizeof(co_task));
@@ -279,10 +282,10 @@ public:
 
 	static void clrTask() {
 		if (Coroutine::curid() == -1) {
-			tasklist& ftl = gfreetasklist;
-			while (ftl.size()) {
-				free(ftl.front());
-				ftl.pop_front();
+			taskvector& tl = gfreetaskvec;
+			while (tl.size()) {
+				free(tl.back());
+				tl.pop_back();
 			}
 			tasklist& wtl = gworktasklist;
 			while (wtl.size()) {
@@ -315,10 +318,10 @@ private:
 
 	static co_task_wrapper* _get_co_task_wrapper() {
 		co_task_wrapper* wrapper = 0;
-		taskwrapperlist& tw = gfreecolist;
+		taskwrappervector& tw = gfreecovec;
 		if (!tw.empty()) {
-			wrapper = tw.front();
-			tw.pop_front();
+			wrapper = tw.back();
+			tw.pop_back();
 		}
 		else {
 			wrapper = (co_task_wrapper*)malloc(sizeof(co_task_wrapper));
@@ -331,8 +334,8 @@ private:
 
 	static void _co_task_func_(void* p) {
 		co_task_wrapper* wrapper = (co_task_wrapper*)p;
-		tasklist& tl = gfreetasklist;
-		taskwrapperlist& ftl = gfreecolist;
+		taskvector& tl = gfreetaskvec;
+		taskwrappervector& tw = gfreecovec;
 		co_task* task = 0;
 		while (wrapper->task) {
 			task = *(wrapper->task);
@@ -340,7 +343,7 @@ private:
 				task->func(task->p);
 				tl.push_back(task);
 			}
-			ftl.push_back(wrapper);
+			tw.push_back(wrapper);
 			Coroutine::yield();
 		}
 		free(wrapper);

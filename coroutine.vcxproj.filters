@@ -16,6 +16,9 @@
     <Filter Include="coroutine">
       <UniqueIdentifier>{d013981a-33f1-4171-b88e-33e7583d6db3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="base">
+      <UniqueIdentifier>{8ea4531a-42dd-4f81-88ec-c7982997e037}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -35,8 +38,14 @@
     <ClInclude Include="coroutine\coroutine.hpp">
       <Filter>coroutine</Filter>
     </ClInclude>
-    <ClInclude Include="coroutine\slist.hpp">
-      <Filter>coroutine</Filter>
+    <ClInclude Include="base\config.hpp">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="base\slist.hpp">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="base\svector.hpp">
+      <Filter>base</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
