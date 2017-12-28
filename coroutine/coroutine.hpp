@@ -4,6 +4,8 @@
 #include "coroutine/config.hpp"
 #include "base/slist.hpp"
 #include "base/svector.hpp"
+#include "base/tls.hpp"
+#include "base/circular_queue.hpp"
 M_COROUTINE_NAMESPACE_BEGIN
 
 typedef void(*_coroutine_func_)(void*ud);
@@ -70,61 +72,7 @@ struct _schedule_ {
 };
 #endif
 
-#ifdef M_PLATFORM_WIN
-template<typename T, int N = 0>
-struct _tlsdata_ {
-	struct _init_ {
-		DWORD _tkey;
-		_init_() {
-			_tkey = TlsAlloc();
-		}
-		~_init_() {
-			delete((T*)TlsGetValue(_tkey));
-			TlsFree(_tkey);
-		}
-	};
-	static T& data() {
-		T* pv = 0;
-		if (0 == (pv = (T*)TlsGetValue(_data._tkey))) {
-			pv = new T;
-			TlsSetValue(_data._tkey, (void*)pv);
-		}
-		return *pv;
-	}
-
-protected:
-	static _init_ _data;
-};
-#else
-template<typename T, int N = 0>
-struct _tlsdata_ {
-	struct _init_ {
-		pthread_key_t _tkey;
-		_init_() {
-			pthread_key_create(&_tkey, 0);
-		}
-		~_init_() {
-			delete((T*)pthread_getspecific(_tkey));
-			pthread_key_delete(_tkey);
-		}
-	};
-	static T& data() {
-		T* pv = 0;
-		if (0 == (pv = (T*)pthread_getspecific(_data._tkey))) {
-			pv = new T;
-			pthread_setspecific(_data._tkey, (void*)pv);
-		}
-		return *pv;
-	}
-
-protected:
-	static _init_ _data;
-};
-#endif
-
-template<typename T, int N>
-typename _tlsdata_<T, N>::_init_ _tlsdata_<T, N>::_data;
-
+#define _tlsdata_ base::tlsdata
 #define gschedule _tlsdata_<_schedule_>::data()
 #define gpristacksize _tlsdata_<unsigned int>::data()
 
@@ -227,23 +175,51 @@ typedef base::slist<co_task*> tasklist;
 typedef base::svector<co_task*> taskvector;
 typedef base::slist<co_task_wrapper*> taskwrapperlist;
 typedef base::svector<co_task_wrapper*> taskwrappervector;
+typedef base::circular_queue<int> id_circular_queue;
 
 #define gfreetaskvec _tlsdata_<taskvector,0>::data()
 #define gworktasklist _tlsdata_<tasklist,0>::data()
 #define gfreecovec	_tlsdata_<taskwrappervector,0>::data()
 #define gallcolist _tlsdata_<taskwrapperlist,0>::data()
+#define gresumetaskque _tlsdata_<id_circular_queue,0>::data()
 
 class CoroutineTask {
 public:
-	static void doTask() {
+	static bool doResume() {
+		if (Coroutine::curid() == -1) {
+			id_circular_queue& idqueue = gresumetaskque;
+			if (!idqueue.empty()) {
+				int id = -1;
+				idqueue.pop_front(id);
+				Coroutine::resume(id);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static void doResume(int id) {
+		if (Coroutine::curid() == -1) {
+			Coroutine::resume(id);
+		}
+	}
+
+	static void addResume(int id) {
+		id_circular_queue& idqueue = gresumetaskque;
+		idqueue.push_back(id);
+	}
+
+	static bool doTask() {
 		if (Coroutine::curid() == -1) {
 			co_task* task = _get_task();
 			if (task) {
 				co_task_wrapper* wrapper = _get_co_task_wrapper();
 				wrapper->task = &task;
 				Coroutine::resume(wrapper->co_id);
+				return true;
 			}
 		}
+		return false;
 	}
 
 	static void doTask(void(*func)(void*), void*p) {
@@ -299,6 +275,8 @@ public:
 				free(wrapper);
 				wtw.pop_front();
 			}
+			id_circular_queue& idqueue = gresumetaskque;
+			idqueue.clear();
 		}
 	}
 

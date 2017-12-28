@@ -47,5 +47,11 @@
     <ClInclude Include="base\svector.hpp">
       <Filter>base</Filter>
     </ClInclude>
+    <ClInclude Include="base\circular_queue.hpp">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="base\tls.hpp">
+      <Filter>base</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -25,6 +25,7 @@ public:
 
 	~svector() {
 		clear();
+		free(_head);
 	}
 
 	bool empty()const {

@@ -44,11 +44,10 @@ void coroutine_test(void* p) {
 }
 
 void func(void*p) {
-	/*while (true) {
-		Coroutine::yield();
-	}*/
-	//cout << "nihao " << Coroutine::curid() << endl;
-	//Coroutine::yield();
+	cout << "sub coroutine " << Coroutine::curid() << endl;
+	CoroutineTask::addResume(Coroutine::curid());
+	Coroutine::yield();
+	cout << "sub coroutine " << Coroutine::curid() << endl;
 }
 
 struct test_stru {
@@ -75,15 +74,16 @@ int main() {
 	int co_count = 20;
 	Coroutine::initEnv(128*1024,false);
 	
-	print_clock(true);
-	int id = Coroutine::create(func, 0);
-	for (int i = 0; i < 1000000; ++i) {
-		//CoroutineTask::addTask(func, 0);
-		//CoroutineTask::doTask();
-		CoroutineTask::doTask(func, 0);
-		//Coroutine::resume(id);
+	CoroutineTask::addTask(func, 0);
+	CoroutineTask::addTask(func, 0);
+
+	//while (true) 
+	{
+		while (CoroutineTask::doTask())
+			;
+		while (CoroutineTask::doResume())
+			;
 	}
-	print_clock(false);
 
 	Coroutine::close();
 	return 0;

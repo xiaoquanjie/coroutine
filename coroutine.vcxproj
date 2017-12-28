@@ -147,9 +147,11 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="base\circular_queue.hpp" />
     <ClInclude Include="base\config.hpp" />
     <ClInclude Include="base\slist.hpp" />
     <ClInclude Include="base\svector.hpp" />
+    <ClInclude Include="base\tls.hpp" />
     <ClInclude Include="coroutine\config.hpp" />
     <ClInclude Include="coroutine\coroutine.hpp" />
     <ClInclude Include="coroutine\co_linux_impl.hpp" />
