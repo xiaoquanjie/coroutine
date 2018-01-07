@@ -225,12 +225,12 @@ public:
 		if (Coroutine::curid() == -1) {
 			unsigned int thrid = base::thread::ctid();
 			intlist tmp;
-			{
-				base::ScopedLock scoped(_mutex);
-				std::map<int, intlist*>::iterator iter = _queue_map.find(thrid);
-				if (iter != _queue_map.end())
-					tmp.join(*iter->second);
-			}
+			_mutex.lock();
+			base::ScopedLock scoped(_mutex);
+			std::map<int, intlist*>::iterator iter = _queue_map.find(thrid);
+			if (iter != _queue_map.end())
+				tmp.join(*iter->second);
+			_mutex.unlock();
 			int co_id;
 			while (!tmp.empty()) {
 				 co_id = tmp.front();
@@ -246,7 +246,7 @@ public:
 	}
 
 	static void addResume(int thrid, int co_id) {
-		base::ScopedLock scoped(_mutex);
+		_mutex.lock();
 		std::map<int, intlist*>::iterator iter = _queue_map.find(thrid);
 		if (iter != _queue_map.end()) {
 			iter->second->push_back(co_id);
@@ -256,6 +256,7 @@ public:
 			pslist->push_back(co_id);
 			_queue_map[thrid] = pslist;
 		}
+		_mutex.unlock();
 	}
 
 	static bool doTask() {

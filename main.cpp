@@ -45,15 +45,41 @@ void coroutine_test(void* p) {
 
 int gcoid1 = -1;
 int gcoid2 = -1;
+int gcoid3 = -1;
+int gcoid4 = -1;
+
+base::MutexLock gmutex;
 
 void func(void*p) {
-	cout << "sub coroutine " << Coroutine::curid() << endl;
+	{
+		base::ScopedLock sc(gmutex);
+		cout << "fun sub coroutine " << Coroutine::curid() << " " << base::thread::ctid() << endl;
+	}
 	if (gcoid1 == -1)
 		gcoid1 = Coroutine::curid();
 	else
 		gcoid2 = Coroutine::curid();
 	Coroutine::yield();
-	cout << "sub coroutine " << Coroutine::curid() << endl;
+	{
+		base::ScopedLock sc(gmutex);
+		cout << "fun sub coroutine " << Coroutine::curid() << " " << base::thread::ctid() << endl;
+	}
+}
+
+void func2(void*p) {
+	{
+		base::ScopedLock sc(gmutex);
+		cout << "fun2 sub coroutine " << Coroutine::curid() << " " << base::thread::ctid() << endl;
+	}
+	if (gcoid3 == -1)
+		gcoid3 = Coroutine::curid();
+	else
+		gcoid4 = Coroutine::curid();
+	Coroutine::yield();
+	{
+		base::ScopedLock sc(gmutex);
+		cout << "fun2 sub coroutine " << Coroutine::curid() << " " << base::thread::ctid() << endl;
+	}
 }
 
 void thread_func(void*) {
@@ -66,13 +92,26 @@ void thread_func(void*) {
 	}
 }
 
+void thread_func2(void*) {
+	Coroutine::initEnv();
+	CoroutineTask::doTask(func2, 0);
+	CoroutineTask::doTask(func2, 0);
+	while (true) {
+		CoroutineTask::doThrResume();
+		base::thread::sleep(2);
+	}
+}
+
 int main() {
 
 	base::thread thr(thread_func, 0);
+	base::thread thr2(thread_func2, 0);
 	int i = 0;
 	cin >> i;
 	CoroutineTask::addResume(thr.tid(), gcoid1);
 	CoroutineTask::addResume(thr.tid(), gcoid2);
+	CoroutineTask::addResume(thr2.tid(), gcoid3);
+	CoroutineTask::addResume(thr2.tid(), gcoid4);
 	cin >> i;
 	return 0;
 }
