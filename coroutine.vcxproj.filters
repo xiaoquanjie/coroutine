@@ -53,5 +53,8 @@
     <ClInclude Include="base\tls.hpp">
       <Filter>base</Filter>
     </ClInclude>
+    <ClInclude Include="base\mutexlock.hpp">
+      <Filter>base</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

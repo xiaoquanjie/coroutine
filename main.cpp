@@ -43,48 +43,36 @@ void coroutine_test(void* p) {
 	print_c(m1);
 }
 
+int gcoid1 = -1;
+int gcoid2 = -1;
+
 void func(void*p) {
 	cout << "sub coroutine " << Coroutine::curid() << endl;
-	CoroutineTask::addResume(Coroutine::curid());
+	if (gcoid1 == -1)
+		gcoid1 = Coroutine::curid();
+	else
+		gcoid2 = Coroutine::curid();
 	Coroutine::yield();
 	cout << "sub coroutine " << Coroutine::curid() << endl;
 }
 
-struct test_stru {
-	int i;
-	test_stru() {
-		cout << "con" << endl;
+void thread_func(void*) {
+	Coroutine::initEnv();
+	CoroutineTask::doTask(func, 0);
+	CoroutineTask::doTask(func, 0);
+	while (true) {
+		CoroutineTask::doThrResume();
+		base::thread::sleep(2);
 	}
-	~test_stru() {
-		cout << "~con" << endl;
-	}
-	test_stru(const test_stru&o) {
-		cout << "copy con" << endl;
-		i = o.i;
-	}
-	test_stru& operator=(const test_stru&o) {
-		cout << "op =" << endl;
-		i = o.i;
-		return *this;
-	}
-};
+}
 
 int main() {
 
-	int co_count = 20;
-	Coroutine::initEnv(128*1024,false);
-	
-	CoroutineTask::addTask(func, 0);
-	CoroutineTask::addTask(func, 0);
-
-	//while (true) 
-	{
-		while (CoroutineTask::doTask())
-			;
-		while (CoroutineTask::doResume())
-			;
-	}
-
-	Coroutine::close();
+	base::thread thr(thread_func, 0);
+	int i = 0;
+	cin >> i;
+	CoroutineTask::addResume(thr.tid(), gcoid1);
+	CoroutineTask::addResume(thr.tid(), gcoid2);
+	cin >> i;
 	return 0;
 }

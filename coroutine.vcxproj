@@ -149,6 +149,7 @@
   <ItemGroup>
     <ClInclude Include="base\circular_queue.hpp" />
     <ClInclude Include="base\config.hpp" />
+    <ClInclude Include="base\mutexlock.hpp" />
     <ClInclude Include="base\slist.hpp" />
     <ClInclude Include="base\svector.hpp" />
     <ClInclude Include="base\tls.hpp" />

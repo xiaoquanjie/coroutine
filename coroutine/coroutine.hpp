@@ -6,6 +6,9 @@
 #include "base/svector.hpp"
 #include "base/tls.hpp"
 #include "base/circular_queue.hpp"
+#include "base/mutexlock.hpp"
+#include <map>
+#include "base/thread.hpp"
 M_COROUTINE_NAMESPACE_BEGIN
 
 typedef void(*_coroutine_func_)(void*ud);
@@ -176,6 +179,7 @@ typedef base::svector<co_task*> taskvector;
 typedef base::slist<co_task_wrapper*> taskwrapperlist;
 typedef base::svector<co_task_wrapper*> taskwrappervector;
 typedef base::circular_queue<int> id_circular_queue;
+typedef base::slist<int> intlist;
 
 #define gfreetaskvec _tlsdata_<taskvector,0>::data()
 #define gworktasklist _tlsdata_<tasklist,0>::data()
@@ -183,7 +187,20 @@ typedef base::circular_queue<int> id_circular_queue;
 #define gallcolist _tlsdata_<taskwrapperlist,0>::data()
 #define gresumetaskque _tlsdata_<id_circular_queue,0>::data()
 
-class CoroutineTask {
+template<typename T>
+struct BaseCoroutineTask {
+protected:
+	static std::map<int, intlist*> _queue_map;
+	static base::MutexLock _mutex;
+};
+
+template<typename T>
+std::map<int, intlist*> BaseCoroutineTask<T>::_queue_map;
+
+template<typename T>
+base::MutexLock BaseCoroutineTask<T>::_mutex;
+
+class CoroutineTask : public BaseCoroutineTask<CoroutineTask>{
 public:
 	static bool doResume() {
 		if (Coroutine::curid() == -1) {
@@ -204,9 +221,41 @@ public:
 		}
 	}
 
+	static void doThrResume() {
+		if (Coroutine::curid() == -1) {
+			unsigned int thrid = base::thread::ctid();
+			intlist tmp;
+			{
+				base::ScopedLock scoped(_mutex);
+				std::map<int, intlist*>::iterator iter = _queue_map.find(thrid);
+				if (iter != _queue_map.end())
+					tmp.join(*iter->second);
+			}
+			int co_id;
+			while (!tmp.empty()) {
+				 co_id = tmp.front();
+				 tmp.pop_front();
+				 Coroutine::resume(co_id);
+			}
+		}
+	}
+
 	static void addResume(int id) {
 		id_circular_queue& idqueue = gresumetaskque;
 		idqueue.push_back(id);
+	}
+
+	static void addResume(int thrid, int co_id) {
+		base::ScopedLock scoped(_mutex);
+		std::map<int, intlist*>::iterator iter = _queue_map.find(thrid);
+		if (iter != _queue_map.end()) {
+			iter->second->push_back(co_id);
+		}
+		else {
+			intlist* pslist = new intlist;
+			pslist->push_back(co_id);
+			_queue_map[thrid] = pslist;
+		}
 	}
 
 	static bool doTask() {
@@ -277,6 +326,12 @@ public:
 			}
 			id_circular_queue& idqueue = gresumetaskque;
 			idqueue.clear();
+
+			unsigned int thrid = base::thread::ctid();
+			base::ScopedLock scoped(_mutex);
+			std::map<int, intlist*>::iterator iter = _queue_map.find(thrid);
+			if (iter != _queue_map.end())
+				iter->second->clear();
 		}
 	}
 
